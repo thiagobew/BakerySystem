@@ -8,9 +8,9 @@ databasePath = 'padaria.db'
 
 
 @contextmanager
-def Conectar(database):
+def Conectar(databasePath):
     try:
-        conn = sqlite3.connect(database)
+        conn = sqlite3.connect(databasePath)
         cursor = conn.cursor()
         yield conn, cursor
 
@@ -39,8 +39,11 @@ def Verificar_Codigo(codigo, quant):
 
         if len(retornos) == 0:
             return False
-        elif len(retornos) == 1 and retornos[0][1] >= int(quant):
-            return True
+        elif len(retornos) == 1:
+            if retornos[0][1] >= int(quant):
+                return True
+            else:
+                return False
         else:
             raise ValueError(
                 "ERRO: Existem códigos duplicados")
@@ -72,7 +75,7 @@ def Remover_Estoque(produtos):
 
         for produto in produtos:
             cursor.execute(
-                f'UPDATE estoque SET quant=(quant - ?) WHERE codigo=?', (produto[1], produto[0]))
+                f'UPDATE estoque SET quant=(quant - ?) WHERE codigo=?', (int(produto[2]), int(produto[0])))
 
         conn.commit()
 
@@ -80,11 +83,11 @@ def Remover_Estoque(produtos):
 def Carregar_Produto(codigo):
     """
     Recebe um codigo e retorna uma tupla com os dados desse produto cadastrados no estoque,
-    Na seguinte ordem: codigo(int), nome(str), valorUnit(float)
+    Na seguinte ordem: codigo(int), nome(str), valorUnit(float), quantidade(int)
     """
     with Conectar(databasePath) as (conn, cursor):
         cursor.execute(
-            f'SELECT codigo, nome, preco FROM estoque WHERE codigo = {codigo}')
+            f'SELECT codigo, nome, preco, quant FROM estoque WHERE codigo = {codigo}')
         conn.commit()
 
         retorno = cursor.fetchall()
@@ -153,9 +156,12 @@ def Cadastrar_User(login, senha):
 
 
 def Cadastrar_Produto(codigo, nome, preco, quantidade):
+    if len(codigo) != 5:
+        raise ValueError("Código deve possuir 5 dígitos")
+
     with Conectar(databasePath) as (conn, cursor):
         cursor.execute(
-            'INSERT INTO estoque (codigo, nome, preco, quant) VALUES (?, ?, ?, ?)',
+            'INSERT or IGNORE INTO estoque (codigo, nome, preco, quant) VALUES (?, ?, ?, ?)',
             (codigo, nome, preco, quantidade))
         conn.commit()
 
@@ -173,4 +179,6 @@ def Buscar_Produto(codigo):
         cursor.execute(
             'SELECT codigo, nome, quant, preco FROM estoque WHERE codigo = ?', (codigo,))
         conn.commit()
+
+        # Retorna uma tupla com os dados na ordem codigo, nome, quant e preco
         return cursor.fetchone()
